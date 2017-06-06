@@ -37,6 +37,12 @@ function get_percentile
 function analyzeVSDHeatmap()
 {
     local uuid="$1"
+    vmguid="$(sc vsd show display attachments uuid $uuid | awk '{ print $2 }' | tail -n +3)"
+    vmname="$(sc vm show display detail guid $vmguid | grep Name | cut -d ":" -f 2)"
+    if ! [ -z "$vmguid" ]; then
+        echo ""
+        echo -e "From VM: $vmname\n"
+    fi
     echo "--- Analyzing Heatmap for VSD $uuid ---\n"
 
     if [ -z "$(sc vsd show | grep ONLINE | grep "$uuid")" ]; then
@@ -44,11 +50,7 @@ function analyzeVSDHeatmap()
         return 1
     fi
 
-    vmguid="$(sc vsd show display attachments uuid $uuid | awk '{ print $2 }' | tail -n +3)"
-    vmname="$(sc vm show display detail guid $vmguid | grep Name | cut -d ":" -f 2)"
-    if ! [ -z "$vmguid" ]; then
-        echo -e "From VM: $vmname\n"
-    fi
+
 
     echo "Counting entry allocations..."
     entryCount="$(dumpVSDL1 "$uuid" | gawk ' /^ address/ { match($1, "([0-9]+)", ary); if (ary[1] % 2 == 0) print $0; }' | grep -v '0:0:0:0x0' | wc -l)"
