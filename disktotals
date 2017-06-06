@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Allocated capacity
+  GBA=`sc vm show display detail | grep -A15 Block | grep VIRTIO_DISK | awk '{print $4}' | grep GB | sed 's/GB//' | paste -sd+ | bc`
+  TBA=`sc vm show display detail | grep -A15 Block | grep VIRTIO_DISK | awk '{print $4}' | grep TB | sed 's/TB//' | paste -sd+ | bc`
+  MBA=`sc vm show display detail | grep -A15 Block | grep VIRTIO_DISK | awk '{print $4}' | grep MB | sed 's/MB//' | paste -sd+ | bc`
+# Raw capacity
+  GBR=`echo "$GBA * 2" | bc`
+  MBR=`echo "$MBA * 2" | bc`
+  TBR=`echo "$TBA * 2" | bc`
+# Convert GB to TB
+  TBG=`echo "$GBA / 1000" | bc`
+  TBD=`echo "$GBR / 1000" | bc`
+# Totals
+TOT=`echo "$TBG + $TBA" | bc`
+TOT2=`echo "$TBD + $TBR" | bc`
+echo ""
+cat /opt/scale/etc/cluster_info
+echo ""
+#echo "$GBA Gigabytes total allocated"
+#echo "$GBT Gigabytes raw"
+#echo " "
+#echo "$TBA Terabytes total allocated"
+#echo "$TBT Terabytes raw"
+#echo " "
+echo "Allocated (consumed) total: $TOT TB "
+echo "Raw (consumed x 2) total: $TOT2 TB"
+echo ""
