@@ -37,7 +37,7 @@ function get_percentile
 function analyzeVSDHeatmap()
 {
     local uuid="$1"
-    echo "--- Analyzing Heatmap for VSD $uuid ---"
+    echo "--- Analyzing Heatmap for VSD $uuid ---\n"
 
     if [ -z "$(sc vsd show | grep ONLINE | grep "$uuid")" ]; then
         echo "No ONLINE vsd with uuid $1";
