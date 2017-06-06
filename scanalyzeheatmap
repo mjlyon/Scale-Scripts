@@ -44,7 +44,7 @@ function analyzeVSDHeatmap()
         return 1
     fi
 
-    vmguid="$(sc vsd show display attachments uuid $uuid | grep -v UUID | awk '{ print $2 }' | head -1)"
+    vmguid="$(sc vsd show display attachments uuid $uuid | grep -v UUID | awk '{ print $2 }' | tail -1)"
 
     if ! [ -z "$vmguid" ]; then
         echo -e "From VM:\n$(sc vm show guid $vmguid)"
