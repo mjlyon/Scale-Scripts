@@ -1,5 +1,9 @@
-#!/bin/bash
 
+
+
+vsd=`sc vm show display detail guid $1 | grep 'VIRTIO_DISK' | awk '{print $5}'`
+
+for vsdUUID in $vsd do;
 function dumpVSDL1()
 {
     local vsd="$1"
@@ -45,9 +49,9 @@ function analyzeVSDHeatmap()
     fi
 
     vmguid="$(sc vsd show display attachments uuid $uuid | grep -v UUID | awk '{ print $2 }' | tail -1)"
-    vmname="$(sc vm show display detail guid $vmguid | grep Name | cut -d ":" -f 2)"
+
     if ! [ -z "$vmguid" ]; then
-        echo -e "From VM: $vmname\n"
+        echo -e "From VM:\n$(sc vm show guid $vmguid)"
     fi
 
     echo "Counting entry allocations..."
