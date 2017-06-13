@@ -1,13 +1,12 @@
-
-
+#!/bin/bash
 
 function dumpVSDL1()
 {
-local vsduuid="$1"
+    local vsd="$1"
     echo $vsd;
-    detail=$(sc vsd show display detail uuid $1)
-    cap=`sc vsd show display detail uuid $1 | grep CapacityBytes | awk '{print $3}'`
-    headers=`sc vsd show display detail uuid $1 | grep  Headers | awk '{ print $3 }' | sed -e 's/,//g'`
+    detail=$(sc vsd show display detail uuid $vsd)
+    cap=`sc vsd show display detail uuid $vsd | grep CapacityBytes | awk '{print $3}'`
+    headers=`sc vsd show display detail uuid $vsd | grep  Headers | awk '{ print $3 }' | sed -e 's/,//g'`
     echo "Headers are $headers"
     l1=$(sc rsd interpret extent $headers-1024 | grep L1table | awk '{ print $4 }');
     echo "Capacity:"
@@ -37,27 +36,33 @@ function get_percentile
 
 function analyzeVSDHeatmap()
 {
-    local vsduuid="$1"
-    echo "--- Analyzing Heatmap for VSD $vsduuid ---"
+    local uuid="$1"
+    vmguid="$(sc vsd show display attachments uuid $uuid | awk '{ print $2 }' | tail -n +3)"
+    vmname="$(sc vm show display detail guid $vmguid | grep Name | cut -d ":" -f 2)"
+    if ! [ -z "$vmguid" ]; then
+        echo -e "From VM: $vmname\n"
+    fi
+    echo "--- Analyzing Heatmap for VSD $uuid ---\n"
 
-    if [ -z "$(sc vsd show | grep ONLINE | grep "$vsduuid")" ]; then
+    if [ -z "$(sc vsd show | grep ONLINE | grep "$uuid")" ]; then
         echo "No ONLINE vsd with uuid $1";
         return 1
     fi
 
-    echo
+
+
     echo "Counting entry allocations..."
-    entryCount="$(dumpVSDL1 "$vsduuid" | gawk ' /^ address/ { match($1, "([0-9]+)", ary); if (ary[1] % 2 == 0) print $0; }' | grep -v '0:0:0:0x0' | wc -l)"
+    entryCount="$(dumpVSDL1 "$uuid" | gawk ' /^ address/ { match($1, "([0-9]+)", ary); if (ary[1] % 2 == 0) print $0; }' | grep -v '0:0:0:0x0' | wc -l)"
 
     echo "Total allocated entries: $entryCount";
 
     if [ $entryCount == "0" ]; then
-        echo "No allocated entries; skipping VSD $vsduuid";
+        echo "No allocated entries; skipping VSD $uuid";
         return 0
     fi
 
     echo "Getting complete heatmap..."
-    distribution="$(sc vsdheatmap show display data uuid $vsduuid edge 0 | sed -s 's/\] \[/\]X\[/g' | tr 'X' '\n' | gawk ' BEGIN { FS=","; top=0; } /^\[/ { match($1, "([0-9]+)", h); match($2, "([0-9]+)", e); dist[e[1]]=h[1]; if (e[1] > top) { top = e[1]; } } END { for (i = 0; i <= top; ++i) { count=dist[i]; if (count == "") { count = 0; }  printf "%5d: %5d ", count, i; for (j = 0; j < count; ++j) { printf "#"; } printf "\n"; } }' | sort -n)"
+    distribution="$(sc vsdheatmap show display data uuid $uuid edge 0 | sed -s 's/\] \[/\]X\[/g' | tr 'X' '\n' | gawk ' BEGIN { FS=","; top=0; } /^\[/ { match($1, "([0-9]+)", h); match($2, "([0-9]+)", e); dist[e[1]]=h[1]; if (e[1] > top) { top = e[1]; } } END { for (i = 0; i <= top; ++i) { count=dist[i]; if (count == "") { count = 0; }  printf "%5d: %5d ", count, i; for (j = 0; j < count; ++j) { printf "#"; } printf "\n"; } }' | sort -n)"
 
     totalHeat="$(echo "$distribution" | gawk '{ total += $1 } END { print total; } ')";
     maxHeat="$(echo "$distribution" | tail -1 | gawk '{ total += $1 } END { print total; } ')";
@@ -75,7 +80,7 @@ function analyzeVSDHeatmap()
     done;
 
     echo "Getting entry distributions:"
-    for i in 1 2 3 5 8 10; do
+    for i in 1 2 3 5 8 10 20 30 40 50; do
         numInPerc="$(awk " BEGIN { print int($entryCount * ($i / 100)); } ")"
         heatInPerc="$(echo "$distribution" | tail -n $numInPerc | awk " { total += int(\$1); } END { print total }")"
         if [ -z "$heatInPerc" ]; then
@@ -87,23 +92,13 @@ function analyzeVSDHeatmap()
     done;
 }
 
-vmguid="$(sc vsd show display attachments uuid $1 | grep -v UUID | awk '{ print $2 }' | tail -1)"
-vmname="$(sc vm show display detail guid $vmguid | grep Name | cut -d ":" -f 2)"
-if ! [ -z "$vmguid" ]; then
-    echo -e "Analyzing Heatmap for VM disks from VM: $vmname\n"
+if [ -z "$1" ]; then
+    # run on all online VSDs
+    uuids="$(sc vsd show | grep ONLINE | awk '{ print $1 }')"
+else
+    uuids=$@;
 fi
 
-for vsduuid in `sc vm show display detail guid $1 | grep 'VIRTIO_DISK' | awk '{print $5}'`
-   do
-      analyzeVSDHeatmap "$vsduuid"
-   done
-#if [ -z "$1" ]; then
-    # run on all online VSDs
-#    uuids="$(sc vsd show | grep ONLINE | awk '{ print $1 }')"
-#else
-#    uuids=$@;
-#fi
-
-#for i in $uuids; do
-  #  analyzeVSDHeatmap "$i";
-#done
+for i in $uuids; do
+    analyzeVSDHeatmap "$i";
+done

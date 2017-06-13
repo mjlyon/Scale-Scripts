@@ -1,0 +1,68 @@
+#!/bin/bash												
+# 						
+# 4/19/2016													
+# Mike Lyon													
+# Scale Computing											
+# mlyon@scalecomputing.com									
+# 4/21/2016 - Added count for VMs and help message			
+# 4/26/2016 - Need to get the usage fixed up										
+# 5/2/2016 - Updated Formatting															
+# ]]												
+#															
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+# Help Message
+# Help
+function usage {
+   echo "Usage: $0 [Tag]";
+   echo ""
+   echo "All arguments are required, no spaces"
+   echo " "
+   echo "[Tag] = Tag of the replicated VM"
+   echo ""
+   echo "Example:"
+   echo "snaptotals Acme"
+   echo ""
+}
+
+if [ $# -lt 1 ]; then
+   echo 1>&2 "Not enough arguments provided"
+   usage 
+   exit 2
+elif [ $# -gt 1 ]; then
+   echo 1>&2 "Too many arguments"
+   usage
+   exit 2
+fi
+
+
+blockDiffArray=()
+finalTotal=0
+
+
+
+
+# Store the blockDiff values in the snapTotal Array
+for vmGUID in `sc vm show display detail | grep -B2 $1 | grep GUID | awk '{print $3}'`
+   do
+      #blockDiffs=`sc vm show display snaps guid $vmGUID | egrep 'User|Automated' | cut -c 140-160 | awk '{print $2}'` 
+      blockDiffs=`sc vm show display snaps guid $vmGUID | grep -A3 Serial | grep Block | awk '{print $3}'`
+      blockDiffArray+=("$blockDiffs")  
+   done
+
+
+# Sum the total from the blockDiffs Array
+for total in ${blockDiffArray[@]}
+   do
+      let finalTotal+=$total
+   done
+
+
+date=`date`   
+# Display the total:
+
+echo "Tag: $1																		"
+
+echo -e '-\t' "   $1 is using:																	"
+echo -e '-\t' "      $(( finalTotal / 1024 )) GB				        						"
+echo -e '-\t' "      worth of 1M Snapshot Block Diffs  "
