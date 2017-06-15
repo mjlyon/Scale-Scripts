@@ -71,11 +71,12 @@ $VirDomainStats = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/
 $Cluster = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/Cluster -Headers $Headers
 $Node = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/Node -Headers $Headers
 
+Write-Host "Cluster Name: " $Cluster.clusterName
+Write-Host "Version:  " $Cluster.icosVersion `n
 
-Write-Host Querying driver verisions
+#Write-Host Querying driver verisions
 
-
-#Loop
+# Loop through each VM and extract information
 ForEach ($x in $VM)
 {
 
@@ -92,7 +93,8 @@ ForEach ($x in $VM)
        $vmdiskuuid = $vmDiskBytes.guid
        Write-Host "     Disk: $vmdiskuuid" `n
        Write-Host "          Capacity:      $vmDiskCapacityGB GB"
-       Write-Host "          Usage:         $vmDiskUsage GB" `n
+       Write-Host "          Usage:         $vmDiskUsage GB"
+       Write-Host "          SSD Priority:" $vmDiskBytes.tieringPriorityFactor `n
     }
 
 
