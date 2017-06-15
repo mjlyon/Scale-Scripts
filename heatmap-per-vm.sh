@@ -42,8 +42,8 @@ function analyzeVSDHeatmap()
     if ! [ -z "$vmguid" ]; then
         echo -e "From VM: $vmname\n"
     fi
-    echo "--- Analyzing Heatmap for VSD $uuid ---\n"
-
+    echo "--- Analyzing Heatmap for VSD $uuid ---"
+    echo ""
     if [ -z "$(sc vsd show | grep ONLINE | grep "$uuid")" ]; then
         echo "No ONLINE vsd with uuid $1";
         return 1
