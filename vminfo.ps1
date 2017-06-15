@@ -2,8 +2,7 @@
 # Dave's connection stanza
 param(
    #[string]$clusterip = "10.205.15.70",
-   [string]$clusterip = "10.205.13.250",
-
+     [string] $clusterip = "10.100.15.11",
      [string] $user = "admin",
      [string] $pass = "scale",
 
@@ -13,13 +12,6 @@ param(
 
 
 )
-
-
-#remove variables to re-initialize - don't accidentally remove params :)
-Remove-Variable VM* -ErrorAction SilentlyContinue
-Remove-Variable drive* -ErrorAction SilentlyContinue
-
-
 
 #initialize variables
 $driverVersion = @()
@@ -52,14 +44,6 @@ Add-Type @"
 
 [ServerCertificateValidationCallback]::Ignore();
 
-$date = get-date -f yyyy-MM-dd-hh-mm-ss
-$hostname = $env:COMPUTERNAME
-Get-WmiObject Win32_PnPSignedDriver| select devicename, driverversion | where {$_.devicename -like '*virtio*'} | Out-File c:\temp\drivers.$hostname.$date.txt
-Get-Content "c:\temp\drivers.$hostname.$date.txt" | foreach {Write-Output $_}
-$hostEnv = Get-ChildItem -Path ENV:*
-
-Get-CimInstance Win32_OperatingSystem | Select-Object  Caption, InstallDate, ServicePackMajorVersion, OSArchitecture, BootDevice,  BuildNumber, CSName | FL
-
 # region This section formats credentials to base64
 
 $pair = "$($user):$($pass)"
@@ -68,6 +52,15 @@ $basicAuthValue = "Basic $encodedCreds"
 $Headers = @{
     Authorization = $basicAuthValue
 }
+
+$date = get-date -f yyyy-MM-dd-hh-mm-ss
+$hostname = $env:COMPUTERNAME
+Get-WmiObject Win32_PnPSignedDriver| select devicename, driverversion | where {$_.devicename -like '*virtio*'} | Out-File c:\temp\drivers.$hostname.$date.txt
+Get-Content "c:\temp\drivers.$hostname.$date.txt" | foreach {Write-Output $_}
+$hostEnv = Get-ChildItem -Path ENV:*
+
+Get-CimInstance Win32_OperatingSystem | Select-Object  Caption, InstallDate, ServicePackMajorVersion, OSArchitecture, BootDevice,  BuildNumber, CSName | FL
+
 
 # region Create PS objects using Scale REST API  - currently creates objects not yet used for interactive use
 # Try to match API object names where possible
@@ -81,27 +74,17 @@ $Node = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/Node -Head
 
 Write-Host Querying driver verisions
 
-# probably delerte $VMNames = $VM | Select-Object | where-object -Property name -ne ""
-$x = $VM
-Write-Host $x
 
 #Loop
 ForEach ($x in $VM)
 {
-  # $names = Select-Object name | where-object name -ne ""
-  # $driverVersion = Get-WmiObject Win32_PnPSignedDriver| select devicename, driverversion | where {$_.devicename -like "*virtio*"}
-  #$x.name[0]
-  #$x.name[1]
-  #Write-Host $VM
-
-
 
   $vmMem = [math]::round($x.mem/1GB, 2)
   Write-Host "VM Name:" $x.name", " $x.description
   #Write-Host "VM GUID:" $x.guid
   Write-Host "CPUs:"  $x.numVCPU
   Write-Host "Memory:"  $vmMem "GB"
-  Write-Host "Running on node: " $x.ip `n
+  Write-Host "Running on node: " $x.console.ip `n
    foreach ($vmDiskBytes in $x.blockDevs | Where-Object type -ne 3)
     {
        $vmDiskCapacityGB = [math]::Round($vmDiskBytes.capacity/1GB, 2)
