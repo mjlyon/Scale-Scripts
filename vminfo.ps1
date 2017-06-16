@@ -16,6 +16,8 @@ param(
 #initialize variables
 $driverVersion = @()
 $VM = @()
+$Cluster = @()
+$winmac = @()
 
 #this is newer certificate block that seems to work in more places
 Add-Type @"
@@ -53,28 +55,40 @@ $Headers = @{
     Authorization = $basicAuthValue
 }
 
-$date = get-date -f yyyy-MM-dd-hh-mm-ss
-$hostname = $env:COMPUTERNAME
-Get-WmiObject Win32_PnPSignedDriver| select devicename, driverversion | where {$_.devicename -like '*virtio*'} | Out-File c:\temp\drivers.$hostname.$date.txt
-Get-Content "c:\temp\drivers.$hostname.$date.txt" | foreach {Write-Output $_}
-$hostEnv = Get-ChildItem -Path ENV:*
-
-Get-CimInstance Win32_OperatingSystem | Select-Object  Caption, InstallDate, ServicePackMajorVersion, OSArchitecture, BootDevice,  BuildNumber, CSName | FL
-
-
-# region Create PS objects using Scale REST API  - currently creates objects not yet used for interactive use
-# Try to match API object names where possible
-
+# Create object lists from REST API calls
 $VM = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/VirDomain -Headers $Headers
 $VirDomain = $VM
 $VirDomainStats = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/VirDomainStats -Headers $Headers
 $Cluster = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/Cluster -Headers $Headers
 $Node = Invoke-RestMethod -Method Get -Uri https://$clusterip/rest/v1/Node -Headers $Headers
 
+# Other Local Variables
+$date = get-date -f yyyy-MM-dd-hh-mm-ss
+$hostname = $env:COMPUTERNAME
+$hostEnv = Get-ChildItem -Path ENV:*
+
+# Create hidden scaletemp directory to store logs
+$path = "c:\scaletemp"
+If((Test-Path $path) -eq $False)
+  {
+	 New-Item "C:\scaletemp" -ItemType Directory |%{$_.Attributes = "hidden"}
+  }
+	Else
+  {
+	}
+
+Get-WmiObject Win32_PnPSignedDriver| select devicename, driverversion | where {$_.devicename -like '*virtio*'} | Out-File c:\temp\drivers.$hostname.$date.txt
+Get-Content "c:\temp\drivers.$hostname.$date.txt" | foreach {Write-Output $_}
+Get-CimInstance Win32_OperatingSystem | Select-Object  Caption, InstallDate, ServicePackMajorVersion, OSArchitecture, BootDevice,  BuildNumber, CSName | FL
+
+
+
+
 Write-Host "Cluster Name: " $Cluster.clusterName
 Write-Host "Version:  " $Cluster.icosVersion `n
 
-#Write-Host Querying driver verisions
+# Determine local subnet and find reachable hosts
+$subnet = $clusterip
 
 # Loop through each VM and extract information
 ForEach ($x in $VM)
@@ -86,7 +100,7 @@ ForEach ($x in $VM)
   Write-Host "CPUs:"  $x.numVCPU
   Write-Host "Memory:"  $vmMem "GB"
   Write-Host "Running on node: " $x.console.ip `n
-   foreach ($vmDiskBytes in $x.blockDevs | Where-Object type -ne 3)
+    foreach ($vmDiskBytes in $x.blockDevs | Where-Object type -ne 3)
     {
        $vmDiskCapacityGB = [math]::Round($vmDiskBytes.capacity/1GB, 2)
        $vmDiskUsage = [math]::Round($vmDiskBytes.allocation/1GB, 2)
@@ -96,6 +110,10 @@ ForEach ($x in $VM)
        Write-Host "          Usage:         $vmDiskUsage GB"
        Write-Host "          SSD Priority:" $vmDiskBytes.tieringPriorityFactor `n
     }
-
+    foreach ($vmNetDevices in $x.netDevs | Where-Object connected -eq "true")
+    {
+      Write-Host $vmNetDevices.macAddress
+      Write-Host $vmNetDevices.vlan
+    }
 
 }
