@@ -1,0 +1,155 @@
+---
+- name: Gather Info
+  hosts: all
+  connection: ansible.builtin.local
+  gather_facts: false
+  vars_prompt:
+​
+#variables
+  - name: username
+    prompt: Enter authentication username
+    private: false
+​
+  - name: password
+    prompt: Enter authenticaion password
+    private: yes
+​
+  - name: server
+    prompt: Enter store number
+    private: false
+​
+  tasks:
+​
+#Configure_DNS
+  - name: DNS
+    scale_computing.hypercore.dns_config:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      search_domains:
+        - royalfarms.com
+      dns_servers:
+        - 10.2.{{Server}}.1
+        - 10.7.{{Server}}.4
+      state: set
+    register: dns
+    with_items: [1,2]
+  - debug:
+      var: dns
+​
+#Import Site Controller
+  - name: Site Controller Import
+    scale_computing.hypercore.vm_import:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      vm_name: "RF{{ server }}Site-Controller"
+      smb:
+        server: smb.server.address.local
+        path: '/Templates/RF-Site-Controller-Template'
+        file_name: RF-Site-Controller-Template.xml
+        username: "{{ username }}"
+        password: "{{ password }}"
+    register: site-controller
+​
+  - name: Site-Controller Results
+    ansible.builtin.debug:
+      msg: "{{ site-controller.msg }}"
+​
+​
+#Configure Cluster Name
+  - name: Configure Cluster Name
+    scale_computing.hypercore.cluster_name:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      name_new: Store {{ server }} Cluster
+    register: cluster
+​
+  - name: Cluster Name Results
+    ansible.builtin.debug:
+      msg: "{{ cluster.record.name }}"
+​
+#Configure Snapshot Schedule
+​
+  - name: Configure Site Controller Snapshot Schedule
+    scale_computing.hypercore.snapshot_schedule:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      name: Site-controller Backup
+      state: present
+      recurrences:
+      - name: Site-Controller Backup
+        frequency: "FREQ=DAILY;INTERVAL=1" #once per day
+        start: "2010-01-01 04:00:00" #start time
+        local_retention: "{{ 2 * 24*60*60 }}" #2 days
+        remote_retention: "0"
+    register: SC-Snapshot
+​
+  - name: Snapshot Result
+    ansible.builtin.debug:
+      msg: "{{ SC-Snapshot.record }}"
+​
+#SMTP Configuration
+​
+  - name: Configure SMTP
+    scale_computing.hypercore.smtp:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      from_address: "{{ server }}_Cluster@royalfarms.com"
+      port: 25
+      server: smtp.royalfarms.com
+      use_ssl: false
+    register: SMTP
+​
+  - name: SMTP Results
+    ansible.builtin.debug:
+      msg: "{{ SMTP.record }}"
+​
+#Set Site Controller Snapshot Schedule
+​
+  - name: Set Site-Controller Snapshot Schedule
+    scale_computing.hypercore.vm_params:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      vm_name: ST{{ server }}Site-Controller
+      snapshot_schedule: "Site-Controller Backup"
+​
+#Time Zone Configuration
+​
+  - name: Configure Timezone
+    scale_computing.hypercore.time_zone:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      zone: "America/New York"
+    register: timezone
+​
+  - name: Timezone Result
+    ansible.builtin.debug:
+      msg: "{{ timezone.record }}"
+​
+#Time Server Configuration
+​
+  - name: Configure Time Server
+    scale_computing.hypercore.time_server:
+      cluster_instance:
+        host: "https://{{ inventory_hostname }}"
+        username: "{{ scale_user }}"
+        password: "{{ scale_pass }}"
+      source: pool.ntp.org
+    register: timeserver
+​
+  - name: Time Server Result
+    ansible.builtin.debug:
+      msg: "{{ timeserver.record }}"
