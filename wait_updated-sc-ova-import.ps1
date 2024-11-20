@@ -1,5 +1,6 @@
 #!/usr/bin/env pwsh
-
+# Written Entirely by Ian Smith of Scale Computing
+# Provided without warranty or support
 <#
 .SYNOPSIS
 Given an OVA file, extract the contents and import as a new VM using the Scale Computing REST API.
