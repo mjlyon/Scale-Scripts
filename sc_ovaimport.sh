@@ -14,10 +14,6 @@ while [[ $# -gt 0 ]]; do
             Credential="$2"
             shift 2
             ;;
-        -SkipCertificateCheck)
-            SkipCertificateCheck="true"
-            shift
-            ;;
         -OVA)
             OVA="$2"
             shift 2
