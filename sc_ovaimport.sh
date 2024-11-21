@@ -3,67 +3,99 @@
 # Written by Ian Smith of Scale Computing, converted to bash
 # Provided without warranty or support
 
+function print_help() {
+    cat << EOF
+Usage: $0 [options]
+
+Options:
+  -server <Server>              Specify the server address (required).
+  -credential <Credential>      Provide the credential in base64 format.
+  -skipcertificatecheck         Skip certificate validation (optional).
+  -ova <Path>                   Full path to the OVA file (required).
+  -performancedrivers <y/n>     Use performance drivers (optional, y/n).
+  -guesttools <y/n>             Insert Guest Tools ISO for Windows (optional, y/n).
+  -donotcleanup                 Skip cleaning up temporary files (optional).
+  -verbose                      Enable verbose output (optional).
+  --help                        Show this help message.
+EOF
+}
+
+# Convert all arguments to lowercase for matching
+ARGS=("$@")
+for ((i = 0; i < $#; i++)); do
+    ARGS[$i]="${ARGS[$i],,}"
+done
+
 # Arguments
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -Server)
+    case "${ARGS[0]}" in
+        -server)
             Server="$2"
             shift 2
             ;;
-        -Credential)
+        -credential)
             Credential="$2"
             shift 2
             ;;
-        -OVA)
+        -skipcertificatecheck)
+            SkipCertificateCheck="true"
+            shift
+            ;;
+        -ova)
             OVA="$2"
             shift 2
             ;;
-        -PerformanceDrivers)
+        -performancedrivers)
             PerformanceDrivers="$2"
             shift 2
             ;;
-        -GuestTools)
+        -guesttools)
             GuestTools="$2"
             shift 2
             ;;
-        -DoNotCleanup)
+        -donotcleanup)
             DoNotCleanup="true"
             shift
             ;;
-        -Verbose)
+        -verbose)
             Verbose="true"
             shift
             ;;
+        --help)
+            print_help
+            exit 0
+            ;;
         *)
-            echo "Unknown option: $1"
+            echo "Unknown option: ${ARGS[0]}"
+            print_help
             exit 1
             ;;
     esac
+    shift
 done
 
-# Set default values if not set
+# Validate required arguments
 if [ -z "$Server" ]; then
-    echo "Server parameter is required."
+    echo "Error: -server parameter is required."
+    print_help
     exit 1
 fi
 
 if [ -z "$OVA" ]; then
-    read -p "Enter full path to OVA file: " OVA
-fi
-
-if [ -z "$PerformanceDrivers" ]; then
-    read -p "Performance Drivers? (y/n): " PerformanceDrivers
-fi
-
-if [ -z "$GuestTools" ]; then
-    read -p "Insert Guest Tools ISO for Windows? (y/n): " GuestTools
-fi
-
-# Check if the OVA exists
-if [ ! -f "$OVA" ]; then
-    echo "OVA file does not exist at $OVA"
+    echo "Error: -ova parameter is required."
+    print_help
     exit 1
 fi
+
+# Check if the OVA file exists
+if [ ! -f "$OVA" ]; then
+    echo "Error: OVA file does not exist at path '$OVA'."
+    exit 1
+fi
+
+# Additional logic remains unchanged
+# ...
+# The rest of the script continues from here...
 
 # Create tmp directory and extract OVA contents
 tmpDir=$(mktemp -d)
