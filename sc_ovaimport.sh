@@ -3,163 +3,138 @@
 # Written by Ian Smith of Scale Computing, converted to bash
 # Provided without warranty or support
 
-function print_help() {
-    cat << EOF
-Usage: $0 [options]
-
-Options:
-  -server <Server>              Specify the server address (required).
-  -credential <Credential>      Provide the credential in base64 format.
-  -skipcertificatecheck         Skip certificate validation (optional).
-  -ova <Path>                   Full path to the OVA file (required).
-  -performancedrivers <y/n>     Use performance drivers (optional, y/n).
-  -guesttools <y/n>             Insert Guest Tools ISO for Windows (optional, y/n).
-  -donotcleanup                 Skip cleaning up temporary files (optional).
-  -verbose                      Enable verbose output (optional).
-  --help                        Show this help message.
-EOF
+function show_menu() {
+    echo "=========================================="
+    echo "          OVA Import Script"
+    echo "=========================================="
+    echo "Please provide the following parameters:"
 }
 
-# Convert all arguments to lowercase for matching
-ARGS=("$@")
-for ((i = 0; i < $#; i++)); do
-    ARGS[$i]="${ARGS[$i],,}"
+function validate_file() {
+    if [ ! -f "$1" ]; then
+        echo "Error: File does not exist at path '$1'."
+        return 1
+    fi
+    return 0
+}
+
+show_menu
+
+# Collect inputs
+read -p "Enter Server address: " Server
+while [ -z "$Server" ]; do
+    echo "Server address is required."
+    read -p "Enter Server address: " Server
 done
 
-# Arguments
-while [[ $# -gt 0 ]]; do
-    case "${ARGS[0]}" in
-        -server)
-            Server="$2"
-            shift 2
-            ;;
-        -credential)
-            Credential="$2"
-            shift 2
-            ;;
-        -skipcertificatecheck)
-            SkipCertificateCheck="true"
-            shift
-            ;;
-        -ova)
-            OVA="$2"
-            shift 2
-            ;;
-        -performancedrivers)
-            PerformanceDrivers="$2"
-            shift 2
-            ;;
-        -guesttools)
-            GuestTools="$2"
-            shift 2
-            ;;
-        -donotcleanup)
-            DoNotCleanup="true"
-            shift
-            ;;
-        -verbose)
-            Verbose="true"
-            shift
-            ;;
-        --help)
-            print_help
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: ${ARGS[0]}"
-            print_help
-            exit 1
-            ;;
-    esac
-    shift
+read -p "Enter Username: " Username
+while [ -z "$Username" ]; do
+    echo "Username is required."
+    read -p "Enter Username: " Username
 done
 
-# Validate required arguments
-if [ -z "$Server" ]; then
-    echo "Error: -server parameter is required."
-    print_help
-    exit 1
-fi
+read -sp "Enter Password: " Password
+echo
+while [ -z "$Password" ]; do
+    echo "Password is required."
+    read -sp "Enter Password: " Password
+    echo
+done
 
-if [ -z "$OVA" ]; then
-    echo "Error: -ova parameter is required."
-    print_help
-    exit 1
-fi
+read -p "Enter full path to the OVA file: " OVA
+while ! validate_file "$OVA"; do
+    read -p "Enter full path to the OVA file: " OVA
+done
 
-# Check if the OVA file exists
-if [ ! -f "$OVA" ]; then
-    echo "Error: OVA file does not exist at path '$OVA'."
-    exit 1
-fi
+read -p "Use performance drivers? (y/n): " PerformanceDrivers
+while [[ ! "$PerformanceDrivers" =~ ^[YyNn]$ ]]; do
+    echo "Please enter 'y' or 'n'."
+    read -p "Use performance drivers? (y/n): " PerformanceDrivers
+done
 
-# Additional logic remains unchanged
-# ...
-# The rest of the script continues from here...
+read -p "Insert Guest Tools ISO for Windows? (y/n): " GuestTools
+while [[ ! "$GuestTools" =~ ^[YyNn]$ ]]; do
+    echo "Please enter 'y' or 'n'."
+    read -p "Insert Guest Tools ISO for Windows? (y/n): " GuestTools
+done
 
-# Create tmp directory and extract OVA contents
+read -p "Do not clean up temporary files? (y/n): " DoNotCleanup
+while [[ ! "$DoNotCleanup" =~ ^[YyNn]$ ]]; do
+    echo "Please enter 'y' or 'n'."
+    read -p "Do not clean up temporary files? (y/n): " DoNotCleanup
+done
+
+read -p "Enable verbose output? (y/n): " Verbose
+while [[ ! "$Verbose" =~ ^[YyNn]$ ]]; do
+    echo "Please enter 'y' or 'n'."
+    read -p "Enable verbose output? (y/n): " Verbose
+done
+
+# Process inputs
+PerformanceDrivers=$( [[ "$PerformanceDrivers" =~ ^[Yy]$ ]] && echo true || echo false )
+GuestTools=$( [[ "$GuestTools" =~ ^[Yy]$ ]] && echo true || echo false )
+DoNotCleanup=$( [[ "$DoNotCleanup" =~ ^[Yy]$ ]] && echo true || echo false )
+Verbose=$( [[ "$Verbose" =~ ^[Yy]$ ]] && echo true || echo false )
+AuthHeader="Authorization: Basic $(echo -n "${Username}:${Password}" | base64)"
+
+# Skip certificate check in curl (-k)
+url="https://$Server/rest/v1"
+
+# Extract the OVA
 tmpDir=$(mktemp -d)
 ovaFileName=$(basename "$OVA")
 tar -C "$tmpDir" -xvf "$OVA" || { echo "Failed to extract OVA"; exit 1; }
 
-# Find the .vmdk file and .ovf file
+# Find the .vmdk and .ovf files
 vmdkList=$(find "$tmpDir" -name "*.vmdk")
 ovfFile=$(find "$tmpDir" -name "*.ovf")
 
-# Parse the OVF XML using `xmllint`
+# Parse the OVF for the VM name
 vmName=$(xmllint --xpath "string(//VirtualSystem/VirtualSystemIdentifier)" "$ovfFile")
 if [ -z "$vmName" ]; then
     vmName="$ovaFileName"
 fi
 
-# Set performance drivers based on user input
-usePerformanceDrivers=false
-if [[ "$PerformanceDrivers" == "Y" || "$PerformanceDrivers" == "y" ]]; then
-    usePerformanceDrivers=true
-fi
-
-# Set Guest Tools insertion based on user input
-attachGuestTools=false
-if [[ "$GuestTools" == "Y" || "$GuestTools" == "y" ]]; then
-    echo "Will insert the SC//Guest Tools ISO for Windows!"
-    attachGuestTools=true
-fi
-
-# Set up for REST API
-url="https://$Server/rest/v1"
-authHeader="Authorization: Basic $(echo -n "$Credential" | base64)"
-
-# Create the VM on the HyperCore system
+# Create VM
 echo "Creating VM $vmName on HyperCore..."
-json="{\"dom\": {\"name\": \"$vmName\", \"desc\": \"$vmName\", \"mem\": 0, \"numVCPU\": 0}}"
-vmUUID=$(curl -X POST "$url/VirDomain/" -H "$authHeader" -H "Content-Type: application/json" -d "$json" | jq -r .createdUUID)
+vmJson="{\"dom\": {\"name\": \"$vmName\", \"desc\": \"$vmName\", \"mem\": 0, \"numVCPU\": 0}}"
+vmUUID=$(curl -k -X POST "$url/VirDomain/" -H "$AuthHeader" -H "Content-Type: application/json" -d "$vmJson" | jq -r .createdUUID)
+if [ -z "$vmUUID" ]; then
+    echo "Error: Failed to create VM."
+    exit 1
+fi
 
-# Upload VMDK disks
+# Upload VMDK files
 for vmdk in $vmdkList; do
     vmdkFileName=$(basename "$vmdk")
     vmdkSize=$(stat --format=%s "$vmdk")
     echo "Uploading $vmdkFileName..."
-    uploadResponse=$(curl -X PUT "$url/VirtualDisk/upload?filename=$vmdkFileName&filesize=$vmdkSize" -H "$authHeader" --data-binary @"$vmdk")
+    uploadResponse=$(curl -k -X PUT "$url/VirtualDisk/upload?filename=$vmdkFileName&filesize=$vmdkSize" -H "$AuthHeader" --data-binary @"$vmdk")
     uploadedUUID=$(echo "$uploadResponse" | jq -r .createdUUID)
-    echo "Finished uploading $vmdkFileName (uuid: $uploadedUUID)"
-    
-    # Attach the disk to the VM
+
+    if [ -z "$uploadedUUID" ]; then
+        echo "Error: Failed to upload $vmdkFileName."
+        exit 1
+    fi
+
+    # Attach the disk
+    diskType=$( [[ "$PerformanceDrivers" == true ]] && echo "VIRTIO_DISK" || echo "IDE_DISK" )
     echo "Attaching $vmdkFileName to VM..."
-    json="{\"template\": {\"virDomainUUID\": \"$vmUUID\", \"type\": \"$(if [ "$usePerformanceDrivers" == true ]; then echo "VIRTIO_DISK"; else echo "IDE_DISK"; fi)\", \"capacity\": $vmdkSize}}"
-    curl -X POST "$url/VirtualDisk/$uploadedUUID/attach" -H "$authHeader" -H "Content-Type: application/json" -d "$json"
+    attachJson="{\"template\": {\"virDomainUUID\": \"$vmUUID\", \"type\": \"$diskType\", \"capacity\": $vmdkSize}}"
+    curl -k -X POST "$url/VirtualDisk/$uploadedUUID/attach" -H "$AuthHeader" -H "Content-Type: application/json" -d "$attachJson"
 done
 
-# Finalize VM settings
-echo "Finalizing VM Settings for $vmName"
-json="{\"name\": \"$vmName\", \"description\": \"Imported from $ovaFileName\", \"mem\": 0, \"numVCPU\": 0}"
-curl -X PATCH "$url/VirDomain/$vmUUID" -H "$authHeader" -H "Content-Type: application/json" -d "$json"
+# Finalize VM Settings
+echo "Finalizing VM settings for $vmName..."
+finalizeJson="{\"name\": \"$vmName\", \"description\": \"Imported from $ovaFileName\", \"mem\": 4096, \"numVCPU\": 2}"
+curl -k -X PATCH "$url/VirDomain/$vmUUID" -H "$AuthHeader" -H "Content-Type: application/json" -d "$finalizeJson"
 
 # Clean up temporary files
-if [ "$DoNotCleanup" != "true" ]; then
+if [ "$DoNotCleanup" != true ]; then
     echo "Cleaning up temporary files..."
     rm -rf "$tmpDir"
 else
-    echo "Skipping cleanup..."
+    echo "Skipping cleanup as requested."
 fi
 
-echo "OVA import complete!"
+echo "OVA import process complete!"
