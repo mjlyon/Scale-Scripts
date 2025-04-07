@@ -1,3 +1,4 @@
+# Generated with ChatGPT
 # List of IPs and ports to check
 $portsToCheck = @(
     @{IP = '35.241.30.219'; Port = 443},
