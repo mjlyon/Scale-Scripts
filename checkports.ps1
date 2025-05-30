@@ -1,4 +1,7 @@
+# Hacked together with chatgpt and a limited knowledge of powershell
+# No Warranty provided whatsoever
 # List of IPs and ports to check
+
 $portsToCheck = @(
     @{IP = '35.241.30.219'; Port = 443},       # Fleet Manager
     @{IP = '206.246.135.231'; Port = 443},     # Update Server
@@ -25,7 +28,8 @@ function Test-PortOpen {
     }
 }
 
-# Check DHCP provider availability
+# Check DHCP provider availability 
+# Hidden for now
 #function Check-DHCP {
 #    try {
 #        $dhcpStatus = Get-WmiObject -Class Win32_NetworkAdapterConfiguration | Where-Object { $_.DHCPEnabled -eq $true }
