@@ -1,13 +1,12 @@
-# Generated with ChatGPT
 # List of IPs and ports to check
 $portsToCheck = @(
-    @{IP = '35.241.30.219'; Port = 443},
-    @{IP = '206.246.135.231'; Port = 443},
-    @{IP = '206.246.135.234'; Port = 22},
-    @{IP = '35.232.148.94'; Port = 443}
+    @{IP = '35.241.30.219'; Port = 443},       # Fleet Manager
+    @{IP = '206.246.135.231'; Port = 443},     # Update Server
+    @{IP = '206.246.135.234'; Port = 22},      # Remote Support
+    @{IP = '35.232.148.94'; Port = 443}        # Broker
 )
 
-# Function to check if a port is open
+# Check Port Availability 
 function Test-PortOpen {
     param(
         [string]$ip,
@@ -27,18 +26,18 @@ function Test-PortOpen {
 }
 
 # Check DHCP provider availability
-function Check-DHCP {
-    try {
-        $dhcpStatus = Get-WmiObject -Class Win32_NetworkAdapterConfiguration | Where-Object { $_.DHCPEnabled -eq $true }
-        if ($dhcpStatus) {
-            return "DHCP is available."
-        } else {
-            return "DHCP is NOT available."
-        }
-    } catch {
-        return "Error checking DHCP provider."
-    }
-}
+#function Check-DHCP {
+#    try {
+#        $dhcpStatus = Get-WmiObject -Class Win32_NetworkAdapterConfiguration | Where-Object { $_.DHCPEnabled -eq $true }
+#        if ($dhcpStatus) {
+#            return "DHCP is available."
+#        } else {
+##            return "DHCP is NOT available."
+ #       }
+ #   } catch {
+ #       return "Error checking DHCP provider."
+ #   }
+#}
 
 # Start checking ports
 $results = @()
@@ -47,8 +46,6 @@ foreach ($entry in $portsToCheck) {
     $results += $result
 }
 
-# Check DHCP status
-$dhcpResult = Check-DHCP
 
 # Combine results
 $finalResults = $results + $dhcpResult
