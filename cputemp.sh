@@ -4,8 +4,8 @@
 # Determines P core count by SMT count; remainder e-cores
 # - Removed 'hud' arg, just specify time for persistent display
 # - Added csv output option with filename generation specification
-# This was written by Chris Nietzold and has no warranty implied or otherwise
-# Changed by M Lyon to adjust XLS output options 
+# This was written by Mikey Lyon Chris Nietzold and has no warranty implied or otherwise
+# Changed by Mikey Lyon to adjust XLS output options 
 
 # Capture sensor output, determine P/E core topology, core arch names
 sense=($(sensors | grep Core | awk '{print $3}'))
