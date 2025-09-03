@@ -108,7 +108,7 @@ function Format-NodeMetrics {
         # Add drive details for each node
         foreach ($Drive in $Node.drives) {
             $DriveInfo = [PSCustomObject]@{
-                'Node UUID' = "  └─ Drive"
+                'Node UUID' = "  Drive"
                 'LAN IP' = $Drive.serialNumber
                 'Backplane IP' = "Slot $($Drive.slot)"
                 'CPU Usage %' = ""
